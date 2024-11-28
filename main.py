@@ -1,5 +1,29 @@
 import webview
 import psycopg
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+from multiprocessing import Process
+
+def bmarks_add(self, url):
+    print(1)
+    self.cursor.execute("INSERT INTO Bookmarks (url, user_id) VALUES (%s, %s)", (url, 1))
+    self.conn.commit()
+
+def bmarks_del():
+    print(2)
+
+def bmarks():
+    root = tk.Tk()
+    root.geometry("300x300")
+    button1=tk.Button(root, text="Add bookmarks", command=bmarks_add)
+    button1.pack(pady=5)
+    
+    button2=tk.Button(root, text="Delete bookmarks", command=bmarks_del)
+    button2.pack(pady=5)
+
+    root.mainloop()
+
+
 
 class Api:
     def __init__(self, **entries):
@@ -19,7 +43,7 @@ class Browser:
         self.conn = psycopg.connect(
             dbname='history',
             user='postgres',
-            password='pasword',
+            password='1234',
             host='localhost',
             port='5432'
         )
@@ -85,7 +109,7 @@ class Browser:
         self.cursor.execute("INSERT INTO history (url, user_id) VALUES (%s, %s)", (url, 1))
         self.conn.commit()
 
-
+       
     def go_back(self):
         """Navigate back in history."""
         if len(self.history_back) > 1:
@@ -129,6 +153,8 @@ class Browser:
         """
         window.evaluate_js(js_script)
 
+     
+
     def start(self):
         """Initialize and start the webview window."""
         self.window = webview.create_window(
@@ -154,4 +180,8 @@ class Browser:
 if __name__ == '__main__':
     initial_url = 'https://zzzhanka.github.io/site2/'
     browser = Browser(initial_url)
+    p1 = Process(target=bmarks, args=(), daemon=True)  
+    p1.start()
     browser.start()
+
+
