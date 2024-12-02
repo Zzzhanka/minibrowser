@@ -119,7 +119,7 @@ class Browser:
         self.db_config = {
             'dbname': 'history',
             'user': 'postgres',
-            'password': 'pasword',
+            'password': '1234',
             'host': 'localhost',
             'port': '5432'
         }
