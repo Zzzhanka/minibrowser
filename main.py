@@ -6,7 +6,6 @@ from tkinter import messagebox, simpledialog
 from multiprocessing import Process
 from queue import Queue
 
-
 class BookmarksManager:
     def __init__(self, db_config):
         self.db_config = db_config
@@ -16,7 +15,7 @@ class BookmarksManager:
 
     def worker(self):
         """Worker thread to handle database operations."""
-        conn = psycopg.connect(**self.db_config)
+        # conn = psycopg.connect(**self.db_config)
         cursor = conn.cursor()
         while True:
             task = self.queue.get()
@@ -58,7 +57,7 @@ class BookmarksManager:
         self.queue.put(None)
 
 
-def bmarks(db_config, move_to_url):
+def bmarks(db_config):
     user_id = 1  # For demonstration; replace with actual user logic
     manager = BookmarksManager(db_config)
 
@@ -74,16 +73,6 @@ def bmarks(db_config, move_to_url):
             manager.delete_bookmark(bookmark_id)
             refresh_bookmarks()
 
-    def open_bookmark(event):
-        selected = listbox.curselection()
-        if selected:
-            def move_callback(bs):
-                for b in bs:
-                    print(selected)
-                    if b[1] == listbox.get(selected[0]):
-                        move_to_url(bs[0][2])
-            manager.fetch_bookmarks(user_id, move_callback)
-            
     def refresh_bookmarks():
         def update_list(bookmarks):
             listbox.delete(0, tk.END)
@@ -95,7 +84,7 @@ def bmarks(db_config, move_to_url):
         manager.fetch_bookmarks(user_id, update_list)
 
     root = tk.Tk()
-    root.title("Bookmarks")
+    root.title("Bookmarks Manager")
     root.geometry("400x400")
 
     button_add = tk.Button(root, text="Add Bookmark", command=add_bookmark)
@@ -103,7 +92,6 @@ def bmarks(db_config, move_to_url):
 
     listbox = tk.Listbox(root)
     listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-    listbox.bind("<Double-1>", open_bookmark)
 
     def on_delete():
         selected = listbox.curselection()
@@ -117,8 +105,7 @@ def bmarks(db_config, move_to_url):
     refresh_bookmarks()
     root.protocol("WM_DELETE_WINDOW", lambda: (manager.stop(), root.destroy()))
     root.mainloop()
-
-
+    
 class Api:
     def __init__(self, **entries):
         self.__dict__.update(entries)
@@ -267,7 +254,7 @@ class Browser:
         )
 
         self.window.events.loaded += self.onWindowLoad
-        p1 = Process(target=bmarks, args=(self.db_config, self.move_to_url), daemon=True)
+        p1 = Process(target=bmarks, args=(self.db_config,), daemon=True)
         p1.start()
         webview.start(debug=False)
 
