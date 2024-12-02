@@ -1,28 +1,122 @@
 import webview
 import psycopg
+import threading
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 from multiprocessing import Process
+from queue import Queue
 
-def bmarks_add(self, url):
-    print(1)
-    self.cursor.execute("INSERT INTO Bookmarks (url, user_id) VALUES (%s, %s)", (url, 1))
-    self.conn.commit()
 
-def bmarks_del():
-    print(2)
+class BookmarksManager:
+    def __init__(self, db_config):
+        self.db_config = db_config
+        self.queue = Queue()
+        self.thread = threading.Thread(target=self.worker, daemon=True)
+        self.thread.start()
 
-def bmarks():
+    def worker(self):
+        """Worker thread to handle database operations."""
+        conn = psycopg.connect(**self.db_config)
+        cursor = conn.cursor()
+        while True:
+            task = self.queue.get()
+            if task is None:
+                break
+            action, data, callback = task
+            try:
+                if action == "add":
+                    cursor.execute(
+                        "INSERT INTO Bookmarks (url, user_id, title) VALUES (%s, %s, %s)",
+                        (data['url'], data['user_id'], data.get('title', 'Untitled'))
+                    )
+                    conn.commit()
+                elif action == "delete":
+                    cursor.execute("DELETE FROM Bookmarks WHERE bookmark_id = %s", (data['bookmark_id'],))
+                    conn.commit()
+                elif action == "fetch":
+                    cursor.execute("SELECT bookmark_id, title, url FROM Bookmarks WHERE user_id = %s", (data['user_id'],))
+                    bookmarks = cursor.fetchall()
+                    if callback:
+                        callback(bookmarks)
+            except Exception as e:
+                print(f"Error in {action}: {e}")
+            finally:
+                self.queue.task_done()
+        cursor.close()
+        conn.close()
+
+    def add_bookmark(self, url, user_id, title=None, callback=None):
+        self.queue.put(("add", {"url": url, "user_id": user_id, "title": title}, callback))
+
+    def delete_bookmark(self, bookmark_id, callback=None):
+        self.queue.put(("delete", {"bookmark_id": bookmark_id}, callback))
+
+    def fetch_bookmarks(self, user_id, callback):
+        self.queue.put(("fetch", {"user_id": user_id}, callback))
+
+    def stop(self):
+        self.queue.put(None)
+
+
+def bmarks(db_config, move_to_url):
+    user_id = 1  # For demonstration; replace with actual user logic
+    manager = BookmarksManager(db_config)
+
+    def add_bookmark():
+        url = simpledialog.askstring("Add Bookmark", "Enter the URL:")
+        title = simpledialog.askstring("Add Bookmark", "Enter the title (optional):")
+        if url:
+            manager.add_bookmark(url, user_id, title)
+            refresh_bookmarks()
+
+    def delete_bookmark(bookmark_id):
+        if messagebox.askyesno("Delete Bookmark", "Are you sure you want to delete this bookmark?"):
+            manager.delete_bookmark(bookmark_id)
+            refresh_bookmarks()
+
+    def open_bookmark(event):
+        selected = listbox.curselection()
+        if selected:
+            def move_callback(bs):
+                for b in bs:
+                    print(selected)
+                    if b[1] == listbox.get(selected[0]):
+                        move_to_url(bs[0][2])
+            manager.fetch_bookmarks(user_id, move_callback)
+            
+    def refresh_bookmarks():
+        def update_list(bookmarks):
+            listbox.delete(0, tk.END)
+            for bookmark in bookmarks:
+                listbox.insert(tk.END, f"{bookmark[1]} ({bookmark[2]})")
+                listbox.bookmark_ids[listbox.size() - 1] = bookmark[0]  # Map index to bookmark ID
+
+        listbox.bookmark_ids = {}
+        manager.fetch_bookmarks(user_id, update_list)
+
     root = tk.Tk()
-    root.geometry("300x300")
-    button1=tk.Button(root, text="Add bookmarks", command=bmarks_add)
-    button1.pack(pady=5)
-    
-    button2=tk.Button(root, text="Delete bookmarks", command=bmarks_del)
-    button2.pack(pady=5)
+    root.title("Bookmarks")
+    root.geometry("400x400")
 
+    button_add = tk.Button(root, text="Add Bookmark", command=add_bookmark)
+    button_add.pack(pady=5)
+
+    listbox = tk.Listbox(root)
+    listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    listbox.bind("<Double-1>", open_bookmark)
+
+    def on_delete():
+        selected = listbox.curselection()
+        if selected:
+            bookmark_id = listbox.bookmark_ids[selected[0]]
+            delete_bookmark(bookmark_id)
+
+    button_delete = tk.Button(root, text="Delete Selected Bookmark", command=on_delete)
+    button_delete.pack(pady=5)
+
+    refresh_bookmarks()
+    root.protocol("WM_DELETE_WINDOW", lambda: (manager.stop(), root.destroy()))
     root.mainloop()
-
 
 
 class Api:
@@ -35,18 +129,19 @@ class Browser:
         self.window = None
         self.history_back = []
         self.history_forward = []
+        self.db_config = {
+            'dbname': 'history',
+            'user': 'postgres',
+            'password': 'pasword',
+            'host': 'localhost',
+            'port': '5432'
+        }
 
         self.initialize_db()
 
     def initialize_db(self):
         """Create the history table if it doesn't exist."""
-        self.conn = psycopg.connect(
-            dbname='history',
-            user='postgres',
-            password='1234',
-            host='localhost',
-            port='5432'
-        )
+        self.conn = psycopg.connect(**self.db_config)
         self.cursor = self.conn.cursor()
         self.cursor.execute("""
         CREATE TABLE IF NOT EXISTS Users (
@@ -95,6 +190,10 @@ class Browser:
         self.conn.commit()
 
 
+    def move_to_url(self, url):
+        print(url)
+        self.window.load_url(url)
+        
     def add_to_history(self, url):
         """Add a URL to the history. Ensure no duplicates if revisiting via back/forward navigation."""
         # If navigating back to or forward to a URL, do not duplicate it.
@@ -168,7 +267,8 @@ class Browser:
         )
 
         self.window.events.loaded += self.onWindowLoad
-
+        p1 = Process(target=bmarks, args=(self.db_config, self.move_to_url), daemon=True)
+        p1.start()
         webview.start(debug=False)
 
     def __del__(self):
@@ -180,8 +280,5 @@ class Browser:
 if __name__ == '__main__':
     initial_url = 'https://zzzhanka.github.io/site2/'
     browser = Browser(initial_url)
-    p1 = Process(target=bmarks, args=(), daemon=True)  
-    p1.start()
     browser.start()
-
 
