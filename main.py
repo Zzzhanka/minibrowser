@@ -15,7 +15,7 @@ class BookmarksManager:
 
     def worker(self):
         """Worker thread to handle database operations."""
-        # conn = psycopg.connect(**self.db_config)
+        conn = psycopg.connect(**self.db_config)
         cursor = conn.cursor()
         while True:
             task = self.queue.get()
