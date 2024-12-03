@@ -178,6 +178,7 @@ def browser_settings_manager(db_config):
     search_engine_entry = tk.Entry(root, width=40)
     search_engine_entry.pack(pady=5)
     search_engine_entry.insert(0, "Search Engine")
+    
 
     button_save = tk.Button(
         root, text="Save Setting",
@@ -219,6 +220,8 @@ class Browser:
             'port': '5432'
         }
 
+        self.initialize_db()
+        self.load_homepage_from_settings()
         self.initialize_db()
 
     def initialize_db(self):
@@ -270,6 +273,17 @@ class Browser:
         """)
         self.conn.commit()
 
+    def load_homepage_from_settings(self):
+        """Load the homepage URL from settings for the current user."""
+        user_id = 1  # Assuming single user
+        self.cursor.execute("SELECT homepage_url FROM BrowserSettings WHERE user_id = %s", (user_id,))
+        result = self.cursor.fetchone()
+        if result and result[0]:  # If homepage URL is set in the database
+            self.initial_url = result[0]
+
+    def update_homepage(self, new_homepage):
+        """Update homepage in the browser."""
+        self.initial_url = new_homepage
 
     def move_to_url(self, url):
         print(url)
@@ -288,8 +302,6 @@ class Browser:
         self.history_forward.clear()
         self.cursor.execute("INSERT INTO history (url, user_id) VALUES (%s, %s)", (url, 1))
         self.conn.commit()
-
-
     def go_back(self):
         """Navigate back in history."""
         if len(self.history_back) > 1:
