@@ -245,7 +245,7 @@ class Browser:
         );
         CREATE TABLE IF NOT EXISTS BrowserSettings (
             setting_id SERIAL PRIMARY KEY,
-            user_id INT NOT NULL,
+            user_id INT NOT NULL UNIQUE,
             homepage_url text DEFAULT 'https://www.default.com',
             default_search_engine VARCHAR(50) DEFAULT 'Google',
             is_dark_mode_enabled BOOLEAN DEFAULT FALSE,
