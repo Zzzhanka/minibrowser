@@ -166,18 +166,26 @@ def browser_settings_manager(db_config):
     def delete_setting(setting_id):
         if messagebox.askyesno("Delete Setting", "Are you sure you want to delete this setting?"):
             manager.delete_setting(setting_id, refresh_settings)
+    def clear_placeholder(event):
+        if homepage_entry.get() == "Homepage URL":
+            homepage_entry.delete(0, tk.END)
+    def clear_placeholder2(event):
+        if search_engine_entry.get() == "Search Engine":
+            search_engine_entry.delete(0, tk.END)
 
     root = tk.Tk()
     root.title("Browser Settings Manager")
     root.geometry("400x400")
-
+    
     homepage_entry = tk.Entry(root, width=40)
-    homepage_entry.pack(pady=5)
     homepage_entry.insert(0, "Homepage URL")
+    homepage_entry.pack(pady=10)
+    homepage_entry.bind("<FocusIn>", clear_placeholder)
 
     search_engine_entry = tk.Entry(root, width=40)
     search_engine_entry.pack(pady=5)
     search_engine_entry.insert(0, "Search Engine")
+    search_engine_entry.bind("<FocusIn>", clear_placeholder2)
     
 
     button_save = tk.Button(
