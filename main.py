@@ -276,7 +276,76 @@ class Browser:
             developer_name VARCHAR(100),
             version VARCHAR(10),
             FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
-        );
+        ); 
+        -- Представление для получения истории посещений с информацией о пользователях
+        CREATE OR REPLACE VIEW UserHistory AS
+        SELECT u.user_id, u.username, h.url, h.visited_at
+        FROM Users u INNER JOIN history h
+        ON  u.user_id = h.user_id;
+
+        -- Представление для получения закладок с информацией о пользователях
+        CREATE OR REPLACE VIEW UserBookmarks AS
+        SELECT 
+            u.user_id, 
+            u.username, 
+            b.title AS bookmark_title, 
+            b.url AS bookmark_url, 
+            b.folder_name, 
+            b.created_at
+        FROM Users u
+        INNER JOIN Bookmarks b
+        ON u.user_id = b.user_id;
+
+        -- Представление для получения настроек браузера с информацией о пользователях
+        CREATE OR REPLACE VIEW UserBrowserSettings AS
+        SELECT 
+            u.user_id, 
+            u.username, 
+            bs.homepage_url, 
+            bs.default_search_engine, 
+            bs.is_dark_mode_enabled
+        FROM Users u
+        LEFT JOIN BrowserSettings bs
+        ON u.user_id = bs.user_id;
+
+        -- Представление для получения списка расширений с информацией о пользователях
+        CREATE OR REPLACE VIEW UserExtensions AS
+        SELECT 
+            u.user_id, 
+            u.username, 
+            e.extension_name, 
+            e.developer_name, 
+            e.version
+        FROM Users u
+        LEFT JOIN Extensions e
+        ON u.user_id = e.user_id;
+
+        -- Представление для получения полной информации о пользователе (история, закладки, настройки)
+        CREATE OR REPLACE VIEW FullUserInfo AS
+        SELECT 
+            u.user_id, 
+            u.username, 
+            h.url AS history_url, 
+            h.visited_at, 
+            b.title AS bookmark_title, 
+            b.url AS bookmark_url, 
+            b.folder_name, 
+            bs.homepage_url, 
+            bs.default_search_engine, 
+            bs.is_dark_mode_enabled, 
+            e.extension_name, 
+            e.developer_name, 
+            e.version
+        FROM Users u
+        LEFT JOIN history h
+        ON u.user_id = h.user_id
+        LEFT JOIN Bookmarks b
+        ON u.user_id = b.user_id
+        LEFT JOIN BrowserSettings bs
+        ON u.user_id = bs.user_id
+        LEFT JOIN Extensions e
+        ON u.user_id = e.user_id;
+
         """)
         self.conn.commit()
     def check_and_register_user(self):
