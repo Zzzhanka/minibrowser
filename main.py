@@ -230,6 +230,7 @@ class Browser:
 
         self.initialize_db()
         self.load_homepage_from_settings()
+        self.check_and_register_user()
         self.initialize_db()
 
     def initialize_db(self):
@@ -276,10 +277,31 @@ class Browser:
             version VARCHAR(10),
             FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
         );
-        insert into Users (user_id, username, email, password_hash) values 
-                            (1, 'Z', 'fghjkf', 'hjksg' ) on conflict do nothing;
         """)
         self.conn.commit()
+    def check_and_register_user(self):
+        """Check if user exists and prompt for registration if not."""
+        self.cursor.execute("SELECT user_id FROM Users")
+        user = self.cursor.fetchone()
+
+        if not user:
+            root = tk.Tk()
+            root.withdraw()
+
+            username = simpledialog.askstring("Registration", "Enter your username:")
+            email = simpledialog.askstring("Registration", "Enter your email:")
+            password = simpledialog.askstring("Registration", "Enter your password:", show="*")
+
+            if username and email and password:
+                self.cursor.execute(
+                    "INSERT INTO Users (username, email, password_hash) VALUES (%s, %s, %s)",
+                    (username, email, password)
+                )
+                self.conn.commit()
+                messagebox.showinfo("Success", "Registration completed!")
+            else:
+                messagebox.showerror("Error", "Registration failed. Please restart the application.")
+                exit()
 
     def load_homepage_from_settings(self):
         """Load the homepage URL from settings for the current user."""
