@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 from multiprocessing import Process
 from queue import Queue
+import bcrypt
 
 
 class BookmarksManager:
@@ -241,10 +242,11 @@ class Browser:
         CREATE TABLE IF NOT EXISTS Users (
             user_id SERIAL PRIMARY KEY,
             username VARCHAR(50) NOT NULL,
-            email VARCHAR(100) UNIQUE NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL CHECK (email ~* '^[^@]+@[^@]+[^@]+$'),
             password_hash VARCHAR(255) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
         CREATE TABLE IF NOT EXISTS history (
             history_id SERIAL PRIMARY KEY,
             user_id INT NOT NULL,
@@ -347,7 +349,8 @@ class Browser:
         ON u.user_id = e.user_id;
 
         """)
-        self.conn.commit()
+        self.conn.commit()  
+
     def check_and_register_user(self):
         """Check if user exists and prompt for registration if not."""
         self.cursor.execute("SELECT user_id FROM Users")
@@ -357,20 +360,35 @@ class Browser:
             root = tk.Tk()
             root.withdraw()
 
-            username = simpledialog.askstring("Registration", "Enter your username:")
-            email = simpledialog.askstring("Registration", "Enter your email:")
-            password = simpledialog.askstring("Registration", "Enter your password:", show="*")
+            while True:
+                username = simpledialog.askstring("Registration", "Enter your username:")
+                if not username:
+                    messagebox.showerror("Error", "Username cannot be empty.")
+                    continue
 
-            if username and email and password:
-                self.cursor.execute(
-                    "INSERT INTO Users (username, email, password_hash) VALUES (%s, %s, %s)",
-                    (username, email, password)
-                )
-                self.conn.commit()
-                messagebox.showinfo("Success", "Registration completed!")
-            else:
-                messagebox.showerror("Error", "Registration failed. Please restart the application.")
-                exit()
+                email = simpledialog.askstring("Registration", "Enter your email:")
+                if not email or "@" not in email:
+                    messagebox.showerror("Error", "Invalid email address. It must contain '@'.")
+                    continue
+
+                password = simpledialog.askstring("Registration", "Enter your password:", show="*")
+                if not password or len(password) < 8:
+                    messagebox.showerror("Error", "Password must be at least 8 characters long.")
+                    continue
+
+                # If all inputs are valid, hash the password and insert into the database
+                hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+                try:
+                    self.cursor.execute(
+                        "INSERT INTO Users (username, email, password_hash) VALUES (%s, %s, %s)",
+                        (username, email, hashed_password.decode('utf-8'))
+                    )
+                    self.conn.commit()
+                    messagebox.showinfo("Success", "Registration completed!")
+                    break
+                except Exception as e:
+                    messagebox.showerror("Error", f"Registration failed: {e}. Please try again.")
 
     def load_homepage_from_settings(self):
         """Load the homepage URL from settings for the current user."""
