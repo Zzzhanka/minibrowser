@@ -151,9 +151,6 @@ def browser_settings_manager(db_config):
     user_id = 1
     manager = BookmarksManager(db_config)
 
-    def save_setting(setting_name, value):
-        manager.add_setting(user_id, setting_name, value, refresh_settings)
-
     def refresh_settings():
         def update_list(settings):
             listbox.delete(0, tk.END)
@@ -163,6 +160,10 @@ def browser_settings_manager(db_config):
 
         listbox.setting_ids = {}
         manager.fetch_settings(user_id, update_list)
+
+    def save_setting(setting_name, value):
+        manager.add_setting(user_id, setting_name, value, refresh_settings)
+        refresh_settings()
 
     def delete_setting(setting_id):
         if messagebox.askyesno("Delete Setting", "Are you sure you want to delete this setting?"):
@@ -203,6 +204,7 @@ def browser_settings_manager(db_config):
         if selected:
             setting_id = listbox.setting_ids[selected[0]]
             delete_setting(setting_id)
+        refresh_settings()
 
     button_delete = tk.Button(root, text="Delete Selected Setting", command=on_delete)
     button_delete.pack(pady=5)
@@ -278,7 +280,24 @@ class Browser:
             developer_name VARCHAR(100),
             version VARCHAR(10),
             FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
-        ); 
+        );
+                            
+        CREATE OR REPLACE FUNCTION log_users()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            RAISE NOTICE 'Triggered action for user_id: %, username: %', NEW.user_id, NEW.username;
+        
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE OR REPLACE TRIGGER log_trigger
+        AFTER INSERT OR UPDATE ON Users
+        FOR EACH ROW
+        EXECUTE FUNCTION log_users();
+
+        CREATE INDEX IF NOT EXISTS idx_username ON Users (username);
+                            
         -- Представление для получения истории посещений с информацией о пользователях
         CREATE OR REPLACE VIEW UserHistory AS
         SELECT u.user_id, u.username, h.url, h.visited_at
